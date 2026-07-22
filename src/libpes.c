@@ -732,7 +732,7 @@ static void *network_send_proc(void *arg)
 
 				if(ps_file == NULL)
 				{
-					ps_file = fopen("/home/h264.ps", "w+");
+					ps_file = fopen("/mnt/h264.ps", "w+");
 				}
 
 				if(ps_file != NULL)

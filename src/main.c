@@ -28,7 +28,7 @@
 		return error_code;																			\
 	}
 
-#define ALIGN_UP(addr, edge)   ((addr + edge - 1) & ~(edge - 1)) /* 数据结构对齐定义 */
+#define ALIGN_UP(addr, edge)   ((addr + edge - 1) & ~(edge - 1))
 #define ALIGN_BACK(addr, edge) ((edge) * (((addr) / (edge))))
 #define ISP_PROC "/proc/driver/isp"
 #define VPU_PROC "/proc/driver/vpu"
@@ -60,7 +60,7 @@ struct isp_sensor_if sensor_func;
 #define ISP_H0	2192
 #define ISP_W	3840
 #define ISP_H	2160
-#define ISP_F	30	//ͼ��֡��
+#define ISP_F	30	
 
 
 static int g_get_stream_stop = 0;
@@ -68,20 +68,6 @@ static int g_get_stream_running = 0;
 
 #define GROUP_ID 0 
 
-
-/*
-*   Name: start_isp
-*            ISP���̳�ʼ��������
-*
-*   Parameters:
-*
-*            None
-*
-*   Return:
-*            0(��ȷ), ��0(����)
-*   Note:
-*       ��
-*/
 int start_isp()
 {
 	int ret;
@@ -102,10 +88,10 @@ int start_isp()
 	FILE *param_file;
 
 		
-	//sensor��λ
+
 	isp_sensor_reset();
 
-	/**ISP memory ����*/
+
 	stMemInit.enOfflineWorkMode   = vimod;
 	stMemInit.enIspOutMode		  = vomod;
 	stMemInit.enIspOutFmt		  = 1;//422 8bit
@@ -114,7 +100,7 @@ int start_isp()
 	ret = API_ISP_MemInit(0, &stMemInit);
 	CHECK_RET(ret != 0, ret);
 
-	//VI��������
+
 	vi_attr.u16InputHeight = ISP_H;
 	vi_attr.u16InputWidth  = ISP_W;
 	vi_attr.u16PicHeight   = ISP_H;
@@ -124,7 +110,7 @@ int start_isp()
 	ret = API_ISP_SetViAttr(0, &vi_attr);
 	CHECK_RET(ret != 0, ret);
 
-	//isp�ص�ע�ᣬ����sensor���ƺ�AE����
+
 	sensor_func.init					= sensor_init_imx415;
 	sensor_func.set_sns_fmt 			= sensor_set_fmt_imx415;
 	sensor_func.set_sns_reg 			= sensor_write_reg;
@@ -140,22 +126,22 @@ int start_isp()
 	ret = API_ISP_SensorRegCb(0, 0, &sensor_func);
 	CHECK_RET(ret != 0, ret);
 	
-	//sensor��ʼ��
+
 	ret = API_ISP_SensorInit(0, &initConf);
 	CHECK_RET(ret != 0, ret);
 	
-	//ISP��ʼ��
+
 	ret = API_ISP_Init(0);
 	CHECK_RET(ret != 0, ret);
 	
-	//��ʼ��vi�豸
+
 	stViDev.enWorkMode = vimod;
 	stViDev.stSize.u16Width  = ISP_W;
 	stViDev.stSize.u16Height = ISP_H;
 	ret = FH_VICAP_InitViDev(0, &stViDev);
 	CHECK_RET(ret != 0, ret);
 	
-	//����vi attr
+
 	stViAttr.enWorkMode = vimod;
 	stViAttr.stInSize.u16Width		= ISP_W0;
 	stViAttr.stInSize.u16Height 		= ISP_H0;
@@ -177,13 +163,13 @@ int start_isp()
 		FH_SYS_Bind(src,dst);
 	}
 	
-	//��ȡisp�����ļ����ص�ַ�ʹ�С
+
 	ret = API_ISP_GetBinAddr(0, &stIsp_para_cfg);
 	param_size = stIsp_para_cfg.u32BinSize;
 	CHECK_RET(ret != 0, ret);
 	
 	
-	//����isp�����ļ�
+
 	isp_param_buff = (char*)malloc(param_size);
 	param_file = fopen(SENSOR_PARAM, "rb");
 	if(NULL == param_file)
@@ -207,26 +193,14 @@ int start_isp()
 	free(isp_param_buff);
 	fclose(param_file);
 
-	//����ISP��ˮ
+
 	ret = isp_server_run();
 	CHECK_RET(ret != 0, ret);
 
 	return 0;
 }
 
-/*
-*   Name: isp_set_param
-*            ����ͼ������
-*
-*   Parameters:
-*
-*            0:ae, 1:awb, 2:ɫ��, 3:����, 4:����, 5:����
-*
-*   Return:
-*            None
-*   Note:
-*       ��
-*/
+
 int isp_set_param(int key, int param)
 {
 	int ret;
@@ -235,22 +209,22 @@ int isp_set_param(int key, int param)
 
 	switch(key)
 	{
-		case ISP_AE: //AEʹ�� ��Χ[0,1]
+		case ISP_AE: //AE[0,1]
 			ret = isp_set_ae(param);
 			break;	
-		case ISP_AWB: //AWBʹ�� ��Χ[0,1]
+		case ISP_AWB: //AWB[0,1]
 			ret = isp_set_awb(param);
 			break;
-		case ISP_COLOR: //ɫ�� ��Χ[1,255]
+		case ISP_COLOR: //[1,255]
 			ret = isp_set_saturation(param);
 			break;
-		case ISP_BRIGHT: //���� ��Χ[0,255]
+		case ISP_BRIGHT: //[0,255]
 			ret = isp_set_bright(param);
 			break;
-		case ISP_NR: //���� ��Χ[0,1]
+		case ISP_NR: //[0,1]
 			ret = isp_set_nr(param);
 			break;
-		case ISP_MF: //���� ��Χ[0,3]
+		case ISP_MF: //[0,3]
 			ret = isp_set_mirrorflip(param);
 			break;
 		default:
@@ -287,7 +261,7 @@ FH_VOID *sample_common_get_stream_proc(FH_VOID *arg)
     {
         WR_PROC_DEV(TRACE_PROC, "timing_GetStream_START");
 
-    	/*����ģʽ��,��ȡһ֡H264����H265����*/
+
         ret = FH_VENC_GetStream_Block(FH_STREAM_ALL & (~(FH_STREAM_JPEG)), &stream);
         WR_PROC_DEV(TRACE_PROC, "timing_EncBlkFinish_xxx");
 
@@ -297,7 +271,7 @@ FH_VOID *sample_common_get_stream_proc(FH_VOID *arg)
             continue;
         }
 		
-		/*��ȡ��һ֡H264����,��������ķ�ʽ����*/
+
         if (stream.stmtype == FH_STREAM_H264)
         {
             subtype = stream.h264_stream.frame_type == FH_FRAME_I ? DMC_MEDIA_SUBTYPE_IFRAME : DMC_MEDIA_SUBTYPE_PFRAME;
@@ -314,7 +288,7 @@ FH_VOID *sample_common_get_stream_proc(FH_VOID *arg)
             }
         }
 
-		/*��ȡ��һ֡H265����,��������ķ�ʽ����*/
+
         else if (stream.stmtype == FH_STREAM_H265)
         {
             subtype = stream.h265_stream.frame_type == FH_FRAME_I ? DMC_MEDIA_SUBTYPE_IFRAME : DMC_MEDIA_SUBTYPE_PFRAME;
@@ -331,7 +305,7 @@ FH_VOID *sample_common_get_stream_proc(FH_VOID *arg)
 			}
         }
 
-        /*��ȡ��һ֡MJPEG����,��������ķ�ʽ����*/
+
         else if (stream.stmtype == FH_STREAM_MJPEG)
         {
             dmc_input(stream.chan,
@@ -343,7 +317,7 @@ FH_VOID *sample_common_get_stream_proc(FH_VOID *arg)
                       1);
         }
 
-		/*�����FH_VENC_GetStream���׵���,���ͷ�������Դ*/
+		//FH_VENC_GetStream
         ret = FH_VENC_ReleaseStream(&stream);
         if(ret)
         {
@@ -370,7 +344,7 @@ static int sampe_set_venc_cfg(int chan, int enc_w, int enc_h)
 	   return ret;
 	}
 	
-	FH_VENC_CHN_CONFIG cfg_param;
+	FH_VENC_CHN_CONFIG cfg_param= {0};
 
 	cfg_param.chn_attr.enc_type 					 = FH_NORMAL_H264;
 	cfg_param.chn_attr.h264_attr.profile			 = H264_PROFILE_MAIN;
@@ -378,21 +352,33 @@ static int sampe_set_venc_cfg(int chan, int enc_w, int enc_h)
 	cfg_param.chn_attr.h264_attr.size.u32Width		 = enc_w;
 	cfg_param.chn_attr.h264_attr.size.u32Height 	 = enc_h;
 
-	cfg_param.rc_attr.rc_type						  = FH_RC_H264_VBR;
-	cfg_param.rc_attr.h264_vbr.bitrate				  = 2*1024*1024;
-	cfg_param.rc_attr.h264_vbr.init_qp				  = 35;
-	cfg_param.rc_attr.h264_vbr.ImaxQP				  = 42;
-	cfg_param.rc_attr.h264_vbr.IminQP				  = 28;
-	cfg_param.rc_attr.h264_vbr.PmaxQP				  = 42;
-	cfg_param.rc_attr.h264_vbr.PminQP				  = 28;
-	cfg_param.rc_attr.h264_vbr.FrameRate.frame_count   = 25;
-	cfg_param.rc_attr.h264_vbr.FrameRate.frame_time	  = 1;
-	cfg_param.rc_attr.h264_vbr.maxrate_percent		  = 200;
-	cfg_param.rc_attr.h264_vbr.IFrmMaxBits			  = 0;
-	cfg_param.rc_attr.h264_vbr.IP_QPDelta			  = 3;
-	cfg_param.rc_attr.h264_vbr.I_BitProp 			  = 5;
-	cfg_param.rc_attr.h264_vbr.P_BitProp 			  = 1;
-	cfg_param.rc_attr.h264_vbr.fluctuate_level		  = 0;
+	cfg_param.rc_attr.rc_type						  = FH_RC_H264_CBR;
+	cfg_param.rc_attr.rc_type = FH_RC_H264_CBR;
+	cfg_param.rc_attr.h264_cbr.bitrate = 1800000;
+	cfg_param.rc_attr.h264_cbr.init_qp = 35;
+	cfg_param.rc_attr.h264_cbr.FrameRate.frame_count = 25;
+	cfg_param.rc_attr.h264_cbr.FrameRate.frame_time = 1;
+	cfg_param.rc_attr.h264_cbr.maxrate_percent = 100;
+	cfg_param.rc_attr.h264_cbr.IFrmMaxBits = 0;
+	cfg_param.rc_attr.h264_cbr.IP_QPDelta = 3;
+	cfg_param.rc_attr.h264_cbr.I_BitProp = 5;
+	cfg_param.rc_attr.h264_cbr.P_BitProp = 1;
+	cfg_param.rc_attr.h264_cbr.fluctuate_level = 6;
+	
+	// cfg_param.rc_attr.h264_vbr.bitrate				  = 2*1024*1024;
+	// cfg_param.rc_attr.h264_vbr.init_qp				  = 35;
+	// cfg_param.rc_attr.h264_vbr.ImaxQP				  = 42;
+	// cfg_param.rc_attr.h264_vbr.IminQP				  = 28;
+	// cfg_param.rc_attr.h264_vbr.PmaxQP				  = 42;
+	// cfg_param.rc_attr.h264_vbr.PminQP				  = 28;
+	// cfg_param.rc_attr.h264_vbr.FrameRate.frame_count   = 25;
+	// cfg_param.rc_attr.h264_vbr.FrameRate.frame_time	  = 1;
+	// cfg_param.rc_attr.h264_vbr.maxrate_percent		  = 200;
+	// cfg_param.rc_attr.h264_vbr.IFrmMaxBits			  = 0;
+	// cfg_param.rc_attr.h264_vbr.IP_QPDelta			  = 3;
+	// cfg_param.rc_attr.h264_vbr.I_BitProp 			  = 5;
+	// cfg_param.rc_attr.h264_vbr.P_BitProp 			  = 1;
+	// cfg_param.rc_attr.h264_vbr.fluctuate_level		  = 0;
 
 	return FH_VENC_SetChnAttr(chan, &cfg_param);
 }
@@ -482,7 +468,7 @@ int sample_set_osd()
 	
     graph_ctrl |= FHT_OSD_GRAPH_CTRL_TOSD_AFTER_VP;
 
-    /* ��ʼ��OSD */
+    /* OSD */
     ret = FHAdv_Osd_Init(0,FHT_OSD_DEBUG_LEVEL_ERROR, graph_ctrl, 0, 0);
     if (ret != FH_SUCCESS)
     {
@@ -490,7 +476,7 @@ int sample_set_osd()
         return ret;
     }
 
-	/* ����asc�ֿ� */
+	/*asc*/
     FHT_OSD_FontLib_t font_lib;
 
 	font_lib.pLibData = asc16;
@@ -502,7 +488,7 @@ int sample_set_osd()
 	    return ret;
 	}
 
-    /* ����gb2312�ֿ� */
+    /* gb2312 */
     font_lib.pLibData = gb2312;
 	font_lib.libSize  = sizeof(gb2312);
 	ret = FHAdv_Osd_LoadFontLib(FHEN_FONT_TYPE_CHINESE, &font_lib);
@@ -523,45 +509,45 @@ int sample_set_osd()
     memset(&text_line_cfg[0], 0, 4 * sizeof(FHT_OSD_TextLine_t));
     memset(&text_data, 0, sizeof(text_data));
 
-	/* ����ת */
+	/*  */
     osd_cfg.osdRotate        = 0;
     osd_cfg.pOsdLayerInfo = &pOsdLayerInfo[0];
-    /* ����text�п���� */
-    osd_cfg.nOsdLayerNum     = 1; /*���ǵ�demo��ֻ��ʾ��һ���п�*/
+
+    osd_cfg.nOsdLayerNum     = 1;
 
     pOsdLayerInfo[0].layerStartX = 0;
     pOsdLayerInfo[0].layerStartY = 0;
-    /* pOsdLayerInfo[0].layerMaxWidth = 640; */ /*�����������ã���������������õ����ֵ�����ڴ棬���ȱʡ����ʵ�ʷ����С�����ڴ�*/
+    /* pOsdLayerInfo[0].layerMaxWidth = 640; */ /*???????????????????????????????????????��????????????????��???????*/
     /* pOsdLayerInfo[0].layerMaxHeight = 480; */
-    /* �����ַ���С,���ص�λ */
+
     pOsdLayerInfo[0].osdSize     = 64;
 
-    /* �����ַ���ɫΪ��ɫ */
+
     pOsdLayerInfo[0].normalColor.fAlpha = 255;
     pOsdLayerInfo[0].normalColor.fRed   = 255;
     pOsdLayerInfo[0].normalColor.fGreen = 255;
     pOsdLayerInfo[0].normalColor.fBlue  = 255;
 
-    /* �����ַ���ɫ��ɫΪ��ɫ */
+
     pOsdLayerInfo[0].invertColor.fAlpha = 255;
     pOsdLayerInfo[0].invertColor.fRed   = 0;
     pOsdLayerInfo[0].invertColor.fGreen = 0;
     pOsdLayerInfo[0].invertColor.fBlue  = 0;
 
-    /* �����ַ�������ɫΪ��ɫ */
+
     pOsdLayerInfo[0].edgeColor.fAlpha = 255;
     pOsdLayerInfo[0].edgeColor.fRed   = 0;
     pOsdLayerInfo[0].edgeColor.fGreen = 0;
     pOsdLayerInfo[0].edgeColor.fBlue  = 0;
 
-    /* ����ʾ���� */
+
     pOsdLayerInfo[0].bkgColor.fAlpha = 0;
 
-    /* ��������Ϊ1 */
+
     pOsdLayerInfo[0].edgePixel        = 1;
 
-    /* ��ɫ���� */
-    pOsdLayerInfo[0].osdInvertEnable  = FH_OSD_INVERT_DISABLE; /*disable��ɫ����*/
+
+    pOsdLayerInfo[0].osdInvertEnable  = FH_OSD_INVERT_DISABLE; /*disable???????*/
     pOsdLayerInfo[0].osdInvertThreshold.high_level = 180;
     pOsdLayerInfo[0].osdInvertThreshold.low_level  = 160;
     pOsdLayerInfo[0].layerFlag = FH_OSD_LAYER_USE_TWO_BUF;
@@ -576,28 +562,28 @@ int sample_set_osd()
 	text_line_cfg[0].textInfo = text_data[0];
 	text_line_cfg[1].textInfo = text_data[1];
 	FH_CHAR user_tag_data[] = {
-        0xe4, 0x0d+0, /*FHT_OSD_USER1,�˴�������ʾ��ǰ����*/
-        0x0a,               /*����*/
-        0xe4, 0x01, /*FHT_OSD_YEAR4, 4λ��,����2019*/
+        0xe4, 0x0d+0, /*FHT_OSD_USER1,*/
+        0x0a,               
+        0xe4, 0x01, /*FHT_OSD_YEAR4, */
         '-',
-        0xe4, 0x03, /*FHT_OSD_MONTH2, 2λ�·�,ȡֵ01��12*/
+        0xe4, 0x03, /*FHT_OSD_MONTH2, */
         '-',
-        0xe4, 0x04, /*FHT_OSD_DAY, 2λ����,ȡֵ01��31*/
-        0x20,       /*�ո�*/
-        0xe4, 0x07, /*FHT_OSD_HOUR24, 24ʱ��Сʱ,ȡֵ00��23*/
+        0xe4, 0x04, /*FHT_OSD_DAY, */
+        0x20,       
+        0xe4, 0x07, /*FHT_OSD_HOUR24, */
         ':',
-        0xe4, 0x09, /*FHT_OSD_MINUTE, 2λ����,ȡֵ00��59*/
+        0xe4, 0x09, /*FHT_OSD_MINUTE, */
         ':',
-        0xe4, 0x0a, /*FHT_OSD_SECOND, 2λ��,ȡֵ00��59*/
+        0xe4, 0x0a, /*FHT_OSD_SECOND, */
         0,          /*null terminated string*/
     };
 #if 1
  	sprintf(text_line_cfg[0].textInfo, "Camera Channel - %d", 0);
-	text_line_cfg[0].textEnable    = 1;                          /* ʹ���Զ���text */
-    text_line_cfg[0].timeOsdEnable = 0;                          /* ȥʹ��ʱ����ʾ */
-    text_line_cfg[0].textLineWidth = (64/2) * 36;				/* ÿ�������ʾ36�����ؿ���Ϊ32���ַ� */
-    text_line_cfg[0].linePositionX = 320;                          /* ���Ͻ���ʼ���������λ�� */
-    text_line_cfg[0].linePositionY = 240;                          /* ���Ͻ���ʼ��߶�����λ�� */
+	text_line_cfg[0].textEnable    = 1;
+    text_line_cfg[0].timeOsdEnable = 0;
+    text_line_cfg[0].textLineWidth = (64/2) * 36;
+    text_line_cfg[0].linePositionX = 320; 
+    text_line_cfg[0].linePositionY = 50;
 
     text_line_cfg[0].lineId = 0;
     text_line_cfg[0].enable = 1;
@@ -611,11 +597,11 @@ int sample_set_osd()
 #endif	
 #if 1
 	strcat(text_line_cfg[1].textInfo, user_tag_data);
-	text_line_cfg[1].textEnable    = 1;                          /* ʹ���Զ���text */
-    text_line_cfg[1].timeOsdEnable = 0;                          /* ȥʹ��ʱ����ʾ */
-    text_line_cfg[1].textLineWidth = (64/2) * 36;				/* ÿ�������ʾ36�����ؿ���Ϊ32���ַ� */
-    text_line_cfg[1].linePositionX = 640;                          /* ���Ͻ���ʼ���������λ�� */
-    text_line_cfg[1].linePositionY = 480;                          /* ���Ͻ���ʼ��߶�����λ�� */
+	text_line_cfg[1].textEnable    = 1;
+    text_line_cfg[1].timeOsdEnable = 0;
+    text_line_cfg[1].textLineWidth = (64/2) * 36;
+    text_line_cfg[1].linePositionX = 640;
+    text_line_cfg[1].linePositionY = 480;
 
     text_line_cfg[1].lineId = 1;
     text_line_cfg[1].enable = 1;
@@ -667,14 +653,48 @@ FH_VOID sample_common_media_driver_config(FH_VOID)
     WR_PROC_DEV(JPEG_PROC, "mjpgstm_12000000_2");
 	
 }
+static int sample_update_bitrate_osd(void)
+{
+    FH_CHN_STATUS status = {0};
+    FHT_OSD_TextLine_t line_cfg = {0};
+    FH_CHAR text[128] = {0};
+    int ret;
 
+    ret = FH_VENC_GetChnStatus(0, &status);
+    if (ret != FH_SUCCESS)
+    {
+        printf("FH_VENC_GetChnStatus failed: 0x%x\n", ret);
+        return ret;
+    }
+
+    snprintf(text, sizeof(text),
+             "Bitrate: %.2f Mbps",
+             status.bps / 1000000.0);
+
+    line_cfg.textInfo = text;
+    line_cfg.textEnable = 1;
+    line_cfg.timeOsdEnable = 0;
+    line_cfg.textLineWidth = (64 / 2) * 36;
+    line_cfg.linePositionX = 320;
+    line_cfg.linePositionY = 50;
+    line_cfg.lineId = 0;
+    line_cfg.enable = 1;
+
+    ret = FHAdv_Osd_SetTextLine(0, 0, 0, &line_cfg);
+    if (ret != FH_SUCCESS)
+    {
+        printf("Update bitrate OSD failed: 0x%x\n", ret);
+    }
+
+    return ret;
+}
 int main(int argc, char *argv[])
 {
     int  ret;
     char *dst_ip;
     unsigned int port;
 
-    /*signal����, CTRL+C�˳�*/
+
     signal(SIGINT,  sample_vlcview_handle_sig);
     signal(SIGQUIT, sample_vlcview_handle_sig);
     signal(SIGKILL, sample_vlcview_handle_sig);
@@ -695,6 +715,9 @@ int main(int argc, char *argv[])
 	start_isp();
 	printf("start_isp success\n");
 	
+
+
+	//VPU GROUP 
 	FH_VPU_SET_GRP_INFO grp_info;
 	grp_info.vi_max_size.u32Width = ISP_W;
 	grp_info.vi_max_size.u32Height = ISP_H;
@@ -703,6 +726,7 @@ int main(int argc, char *argv[])
 
     ret = FH_VPSS_CreateGrp(GROUP_ID, &grp_info);
 	CHECK_RET(ret != 0, ret);
+
 	
 	FH_VPU_SIZE vi_pic;
 	vi_pic.vi_size.u32Width  = ISP_W;
@@ -732,10 +756,14 @@ int main(int argc, char *argv[])
 	chn_info.max_stride = 0;
 	ret = FH_VPSS_CreateChn(GROUP_ID, 0, &chn_info);
 	CHECK_RET(ret != 0, ret);
+	
+	//chn
+	// ret = FH_VPSS_CreateChn(GROUP_ID, 1, &chn_info);
+	// CHECK_RET(ret != 0, ret);
 
     FH_VPU_CHN_CONFIG chn_attr;
-    chn_attr.vpu_chn_size.u32Width  = 1920;
-    chn_attr.vpu_chn_size.u32Height = 1080;
+    chn_attr.vpu_chn_size.u32Width  = 1280;
+    chn_attr.vpu_chn_size.u32Height = 720;
 	chn_attr.crop_area.crop_en = 0;
     chn_attr.crop_area.vpu_crop_area.u32X = 0;
     chn_attr.crop_area.vpu_crop_area.u32Y = 0;
@@ -744,8 +772,24 @@ int main(int argc, char *argv[])
     chn_attr.offset = 0;
     chn_attr.depth = 1;
     chn_attr.stride = 0;
-    ret = FH_VPSS_SetChnAttr(GROUP_ID, 0, &chn_attr);  //����VPU��ͼ����ߣ��ɷŴ���С
+    ret = FH_VPSS_SetChnAttr(GROUP_ID, 0, &chn_attr);
     CHECK_RET(ret != 0, ret);
+
+	// FH_VPU_CHN_CONFIG chn_attr2;
+    // chn_attr2.vpu_chn_size.u32Width  = 640;
+    // chn_attr2.vpu_chn_size.u32Height = 360;
+	// chn_attr2.crop_area.crop_en = 0;
+    // chn_attr2.crop_area.vpu_crop_area.u32X = 0;
+    // chn_attr2.crop_area.vpu_crop_area.u32Y = 0;
+    // chn_attr2.crop_area.vpu_crop_area.u32Width = 0;
+    // chn_attr2.crop_area.vpu_crop_area.u32Height = 0;
+    // chn_attr2.offset = 0;
+    // chn_attr2.depth = 1;
+    // chn_attr2.stride = 0;
+    // ret = FH_VPSS_SetChnAttr(GROUP_ID, 1, &chn_attr2);  //????VPU???????????????��
+    // CHECK_RET(ret != 0, ret);
+
+
 
     ret = FH_VPSS_SetVOMode(GROUP_ID, 0, VPU_VOMODE_SCAN);
     CHECK_RET(ret != 0, ret);
@@ -753,8 +797,17 @@ int main(int argc, char *argv[])
 	ret = FH_VPSS_OpenChn(GROUP_ID, 0);
 	CHECK_RET(ret != 0, ret);
 
-	ret = sampe_set_venc_cfg(0, 1920, 1080);//���ñ���Ŀ��ߣ���Ҫ��󶨵�VPU�Ŀ���һ��
+	ret = sampe_set_venc_cfg(0, 1280, 720);
 	CHECK_RET(ret != 0, ret);
+
+
+	// ret = FH_VPSS_SetVOMode(GROUP_ID, 1, VPU_VOMODE_SCAN);
+    // CHECK_RET(ret != 0, ret);
+	// ret = FH_VPSS_OpenChn(GROUP_ID, 1);
+	// CHECK_RET(ret != 0, ret);
+	// ret = sampe_set_venc_cfg(1, 640, 360);
+	// CHECK_RET(ret != 0, ret);
+
 
 	FH_BIND_INFO src, dst;
 	src.obj_id = FH_OBJ_ISP;
@@ -768,6 +821,10 @@ int main(int argc, char *argv[])
 	
 	ret = FH_VENC_StartRecvPic(0);
 	CHECK_RET(ret != 0, ret);
+
+
+	// ret = FH_VENC_StartRecvPic(1);
+	// CHECK_RET(ret != 0, ret);
 	
     src.obj_id = FH_OBJ_VPU_VO;
     src.dev_id = GROUP_ID;
@@ -776,10 +833,21 @@ int main(int argc, char *argv[])
     dst.obj_id = FH_OBJ_ENC;
     dst.dev_id = 0;
     dst.chn_id = 0;
-	
+
     ret = FH_SYS_Bind(src, dst);
 	CHECK_RET(ret != 0, ret);
 
+	// src.obj_id = FH_OBJ_VPU_VO;
+	// src.dev_id = GROUP_ID;
+	// src.chn_id = 1;
+
+	// dst.obj_id = FH_OBJ_ENC;
+	// dst.dev_id = 0;
+	// dst.chn_id = 1;
+
+	// ret = FH_SYS_Bind(src, dst);
+	// CHECK_RET(ret != 0, ret);
+	// 
 	sample_dmc_init(dst_ip, port, 1);
 	
 	pthread_attr_t attr;
@@ -799,19 +867,19 @@ int main(int argc, char *argv[])
 	CHECK_RET(ret != 0, ret);
 #endif
 
-	isp_set_param(ISP_AE, 1);  //�����Զ��ع�
+	isp_set_param(ISP_AE, 1);  
 
-	isp_set_param(ISP_AWB, 1); //�����Զ���ƽ��
+	isp_set_param(ISP_AWB, 1); 
 
-	isp_set_param(ISP_COLOR, 25); //����ͼ�񱥺Ͷ�
+	isp_set_param(ISP_COLOR, 25);
 
-	isp_set_param(ISP_BRIGHT, 125); //��������
+	isp_set_param(ISP_BRIGHT, 125);
 
-	isp_set_param(ISP_NR, 1); //���ý���
+	isp_set_param(ISP_NR, 1);
 
-	isp_set_param(ISP_MF, 0); //���þ���
+	isp_set_param(ISP_MF, 3);
 #if 1
-	FH_VPU_MASK stVpumaskinfo;  //����������
+	FH_VPU_MASK stVpumaskinfo;
 	memset(&stVpumaskinfo,0x0,sizeof(FH_VPU_MASK));
 
 	stVpumaskinfo.mask_enable[0] = 1;
@@ -820,14 +888,14 @@ int main(int argc, char *argv[])
 	stVpumaskinfo.area_value[0].u32Width = 200; 
 	stVpumaskinfo.area_value[0].u32Height = 200; 
 
-	stVpumaskinfo.color = 0xffda059a;//��ɫ 0xff008080 ��ɫ 0xffff8080 ��ɫ 0xffda059a ��ɫ 0xff7abe29
+	stVpumaskinfo.color = 0xffda059a;// 0xff008080  0xffff8080  0xffda059a  0xff7abe29
 	
 	ret = FH_VPSS_SetMask(0, &stVpumaskinfo);
 	CHECK_RET(ret != 0, ret);
 #endif
 #if 0
 	sleep(2);
-	ret = sampe_set_jpeg_cfg(1, 3840, 2160, 40);  //ץͼ
+	ret = sampe_set_jpeg_cfg(1, 3840, 2160, 40);  //
 	CHECK_RET(ret != 0, ret);
 
 	ret = sampe_set_jpeg_cfg(1, 3840, 2160, 80);
@@ -835,7 +903,8 @@ int main(int argc, char *argv[])
 #endif
     while (!g_sig_stop)
     {
-        usleep(20000);
+        sample_update_bitrate_osd();
+		usleep(1000000);
     }
 
     return 0;
