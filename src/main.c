@@ -1,12 +1,10 @@
-///////////////////////////////////////////////////
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <sys/ioctl.h>
 
 #include "fh_system_mpi.h"
 #include "fh_vpu_mpi.h"
@@ -71,6 +69,66 @@ static int g_get_stream_running = 0;
 
 #define GROUP_ID 0 
 
+#define LED_DEVICE    "/dev/helloworld"
+#define LED_IOC_MAGIC 'L'
+#define SET_LED_OFF   _IO(LED_IOC_MAGIC, 1)
+#define SET_LED_ON    _IO(LED_IOC_MAGIC, 2)
+#define SET_LED_BLINK _IO(LED_IOC_MAGIC, 3)
+
+static int g_led_fd = -1;
+
+static int stream_led_init(void)
+{
+	g_led_fd = open(LED_DEVICE, O_RDWR);
+	if (g_led_fd < 0)
+	{
+		perror("open " LED_DEVICE);
+		return -1;
+	}
+
+	if (ioctl(g_led_fd, SET_LED_OFF, 0) < 0)
+	{
+		perror("SET_LED_OFF");
+	}
+
+	return 0;
+}
+
+static void stream_led_set(int on)
+{
+	if (g_led_fd < 0)
+	{
+		return;
+	}
+
+	if (ioctl(g_led_fd, on ? SET_LED_ON : SET_LED_OFF, 0) < 0)
+	{
+		perror(on ? "SET_LED_ON" : "SET_LED_OFF");
+	}
+}
+
+static void stream_led_blink(void)
+{
+	if (g_led_fd < 0)
+	{
+		return;
+	}
+
+	if (ioctl(g_led_fd, SET_LED_BLINK, 0) < 0)
+	{
+		perror("SET_LED_BLINK");
+	}
+}
+
+static void stream_led_deinit(void)
+{
+	if (g_led_fd >= 0)
+	{
+		ioctl(g_led_fd, SET_LED_OFF, 0);
+		close(g_led_fd);
+		g_led_fd = -1;
+	}
+}
 int start_isp()
 {
 	int ret;
@@ -705,6 +763,8 @@ int main(int argc, char *argv[])
 
     dst_ip = argc > 1 ? argv[1] : NULL;
     port   = argc > 2 ? strtol(argv[2], NULL, 0) : 1234;
+	stream_led_init();
+	stream_led_set(1);
 
 	printf("demo_main driver_config\n");
 
@@ -904,11 +964,19 @@ int main(int argc, char *argv[])
 	ret = sampe_set_jpeg_cfg(1, 3840, 2160, 80);
 	CHECK_RET(ret != 0, ret);
 #endif
-    while (!g_sig_stop)
+	if (dst_ip != NULL && *dst_ip != '\0')
+	{
+		stream_led_blink(); /* Streaming: blink. */
+	}
+
+	while (!g_sig_stop)
     {
         sample_update_bitrate_osd();
 		usleep(1000000);
     }
+
+	printf("stream stopped, LED OFF\n");
+	stream_led_deinit();
 
     return 0;
 }
