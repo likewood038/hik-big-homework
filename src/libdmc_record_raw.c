@@ -95,7 +95,7 @@ int dmc_record_subscribe(int max_channel)
 
     g_max_num = max_channel;
 
-    dmc_subscribe("RECORD", DMC_MEDIA_TYPE_JPEG, _record_input_fn);
+    dmc_subscribe("RECORD", DMC_MEDIA_TYPE_H264 | DMC_MEDIA_TYPE_H265 | DMC_MEDIA_TYPE_JPEG, _record_input_fn);
 
     return 0;
 }
