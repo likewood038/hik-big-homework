@@ -22,12 +22,12 @@
 #include "vicap/fh_vicap_mpi.h"
 
 
-#define CHECK_RET(state, error_code)																	\
-	if (state)																						\
-	{																								\
-		printf("[%s]:%d line [%s] return 0x%x ERROR\n",__FILE__,__LINE__ , __func__, error_code);	\
-		return error_code;																			\
-	}
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/time.h>
+#define TIME_SERVER_PORT 9999
+
 
 #define ALIGN_UP(addr, edge)   ((addr + edge - 1) & ~(edge - 1))
 #define ALIGN_BACK(addr, edge) ((edge) * (((addr) / (edge))))
@@ -560,7 +560,7 @@ int sample_set_osd()
 	}
 
 	FHT_OSD_CONFIG_t osd_cfg;
-    FHT_OSD_Layer_Config_t  pOsdLayerInfo[4];
+    FHT_OSD_Layer_Config_t pOsdLayerInfo[4];
     FHT_OSD_TextLine_t text_line_cfg[4];
     FH_CHAR text_data[4][128]; /*it should be enough*/
     FH_SINT32 user_defined_time = 0;
@@ -574,46 +574,87 @@ int sample_set_osd()
     osd_cfg.osdRotate        = 0;
     osd_cfg.pOsdLayerInfo = &pOsdLayerInfo[0];
 
-    osd_cfg.nOsdLayerNum     = 1;
+    osd_cfg.nOsdLayerNum     = 3;
 
     pOsdLayerInfo[0].layerStartX = 0;
     pOsdLayerInfo[0].layerStartY = 0;
     /* pOsdLayerInfo[0].layerMaxWidth = 640; */ /*???????????????????????????????????????��????????????????��???????*/
     /* pOsdLayerInfo[0].layerMaxHeight = 480; */
-
     pOsdLayerInfo[0].osdSize     = 64;
-
 
     pOsdLayerInfo[0].normalColor.fAlpha = 255;
     pOsdLayerInfo[0].normalColor.fRed   = 255;
-    pOsdLayerInfo[0].normalColor.fGreen = 255;
-    pOsdLayerInfo[0].normalColor.fBlue  = 255;
-
+    pOsdLayerInfo[0].normalColor.fGreen = 0;
+    pOsdLayerInfo[0].normalColor.fBlue  = 0;
 
     pOsdLayerInfo[0].invertColor.fAlpha = 255;
     pOsdLayerInfo[0].invertColor.fRed   = 0;
     pOsdLayerInfo[0].invertColor.fGreen = 0;
     pOsdLayerInfo[0].invertColor.fBlue  = 0;
 
-
     pOsdLayerInfo[0].edgeColor.fAlpha = 255;
     pOsdLayerInfo[0].edgeColor.fRed   = 0;
     pOsdLayerInfo[0].edgeColor.fGreen = 0;
     pOsdLayerInfo[0].edgeColor.fBlue  = 0;
 
-
     pOsdLayerInfo[0].bkgColor.fAlpha = 0;
-
-
     pOsdLayerInfo[0].edgePixel        = 1;
-
-
     pOsdLayerInfo[0].osdInvertEnable  = FH_OSD_INVERT_DISABLE; /*disable???????*/
     pOsdLayerInfo[0].osdInvertThreshold.high_level = 180;
     pOsdLayerInfo[0].osdInvertThreshold.low_level  = 160;
     pOsdLayerInfo[0].layerFlag = FH_OSD_LAYER_USE_TWO_BUF;
     pOsdLayerInfo[0].layerId = 0;
-	
+
+	//Layer 1 TIME(fan)
+	pOsdLayerInfo[1].layerStartX = 0;
+	pOsdLayerInfo[1].layerStartY = 0;
+	pOsdLayerInfo[1].osdSize = 64;
+
+	pOsdLayerInfo[1].normalColor.fAlpha = 255;
+	pOsdLayerInfo[1].normalColor.fRed = 255;
+	pOsdLayerInfo[1].normalColor.fGreen = 255;
+	pOsdLayerInfo[1].normalColor.fBlue = 255;
+
+	pOsdLayerInfo[1].invertColor.fAlpha = 255;
+	pOsdLayerInfo[1].invertColor.fRed = 0;
+	pOsdLayerInfo[1].invertColor.fGreen = 0;
+	pOsdLayerInfo[1].invertColor.fBlue = 0;
+
+	pOsdLayerInfo[1].edgeColor.fAlpha = 255;
+	pOsdLayerInfo[1].edgeColor.fRed = 0;
+	pOsdLayerInfo[1].edgeColor.fGreen = 0;
+	pOsdLayerInfo[1].edgeColor.fBlue = 0;
+
+	pOsdLayerInfo[1].bkgColor.fAlpha = 0;
+	pOsdLayerInfo[1].edgePixel = 0;
+	pOsdLayerInfo[1].osdInvertEnable = FH_OSD_INVERT_BY_CHAR; /* Layer 1:  ���ַ���ɫ */
+	pOsdLayerInfo[1].osdInvertThreshold.high_level = 100;
+	pOsdLayerInfo[1].osdInvertThreshold.low_level = 80;
+	pOsdLayerInfo[1].layerFlag = FH_OSD_LAYER_USE_TWO_BUF;
+	pOsdLayerInfo[1].layerId = 1;
+
+	/* Layer 2: 码率，红色，不反色 */
+	pOsdLayerInfo[2].layerStartX = 0;
+	pOsdLayerInfo[2].layerStartY = 0;
+	pOsdLayerInfo[2].osdSize = 64;
+
+	pOsdLayerInfo[2].normalColor.fAlpha = 255;
+	pOsdLayerInfo[2].normalColor.fRed = 255;
+	pOsdLayerInfo[2].normalColor.fGreen = 0;
+	pOsdLayerInfo[2].normalColor.fBlue = 0;
+
+	pOsdLayerInfo[2].invertColor.fAlpha = 255;
+	pOsdLayerInfo[2].invertColor.fRed = 255;
+	pOsdLayerInfo[2].invertColor.fGreen = 0;
+	pOsdLayerInfo[2].invertColor.fBlue = 0;
+
+	pOsdLayerInfo[2].edgeColor.fAlpha = 0;
+	pOsdLayerInfo[2].bkgColor.fAlpha = 0;
+	pOsdLayerInfo[2].edgePixel = 0;
+	pOsdLayerInfo[2].osdInvertEnable = FH_OSD_INVERT_DISABLE;
+	pOsdLayerInfo[2].layerFlag = FH_OSD_LAYER_USE_TWO_BUF;
+	pOsdLayerInfo[2].layerId = 2;
+
 	ret = FHAdv_Osd_Ex_SetText(0, 0, &osd_cfg);
     if (ret != FH_SUCCESS)
     {
@@ -639,7 +680,7 @@ int sample_set_osd()
         0,          /*null terminated string*/
     };
 #if 1
- 	sprintf(text_line_cfg[0].textInfo, "Camera Channel - %d", 0);
+ 	sprintf(text_line_cfg[0].textInfo, "group-name - %d", 0);
 	text_line_cfg[0].textEnable    = 1;
     text_line_cfg[0].timeOsdEnable = 0;
     text_line_cfg[0].textLineWidth = (64/2) * 36;
@@ -667,7 +708,7 @@ int sample_set_osd()
     text_line_cfg[1].lineId = 1;
     text_line_cfg[1].enable = 1;
 
-	ret = FHAdv_Osd_SetTextLine(0, 0, pOsdLayerInfo[0].layerId, &text_line_cfg[1]);
+	ret = FHAdv_Osd_SetTextLine(0, 0, pOsdLayerInfo[1].layerId, &text_line_cfg[1]);
 	if (ret != FH_SUCCESS)
 	{
 		printf("FHAdv_Osd_Ex_SetText failed with %d\n", ret);
@@ -736,12 +777,13 @@ static int sample_update_bitrate_osd(void)
     line_cfg.textEnable = 1;
     line_cfg.timeOsdEnable = 0;
     line_cfg.textLineWidth = (64 / 2) * 36;
-    line_cfg.linePositionX = 320;
-    line_cfg.linePositionY = 50;
-    line_cfg.lineId = 0;
+    line_cfg.linePositionX = 640;
+    line_cfg.linePositionY = 430;
+
+    line_cfg.lineId = 2;
     line_cfg.enable = 1;
 
-    ret = FHAdv_Osd_SetTextLine(0, 0, 0, &line_cfg);
+    //ret = FHAdv_Osd_SetTextLine(0, 0,3, &line_cfg);
     if (ret != FH_SUCCESS)
     {
         printf("Update bitrate OSD failed: 0x%x\n", ret);
@@ -749,6 +791,51 @@ static int sample_update_bitrate_osd(void)
 
     return ret;
 }
+
+/* 从电脑获取时间并设置系统时钟 */
+static void sync_time_from_pc(const char *pc_ip)
+{
+	int sock;
+	struct sockaddr_in addr;
+	char buf[32] = {0};
+
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock < 0)
+	{
+		printf("time sync: socket failed\n");
+		return;
+	}
+
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(TIME_SERVER_PORT);
+	addr.sin_addr.s_addr = inet_addr(pc_ip);
+
+	if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+	{
+		printf("time sync: connect to %s failed\n", pc_ip);
+		close(sock);
+		return;
+	}
+
+	int n = recv(sock, buf, sizeof(buf) - 1, 0);
+	close(sock);
+
+	if (n > 0)
+	{
+		struct timeval tv;
+		tv.tv_sec = atol(buf);
+		tv.tv_usec = 0;
+		settimeofday(&tv, NULL);
+		setenv("TZ", "CST-8", 1);  /* 设置为中国时区 UTC+8 */
+		tzset();
+		printf("time sync: set to %s", ctime(&tv.tv_sec));
+	}
+	else
+	{
+		printf("time sync: no data\n");
+	}
+}
+
 int main(int argc, char *argv[])
 {
     int  ret;
@@ -762,9 +849,15 @@ int main(int argc, char *argv[])
     signal(SIGTERM, sample_vlcview_handle_sig);
 
     dst_ip = argc > 1 ? argv[1] : NULL;
-    port   = argc > 2 ? strtol(argv[2], NULL, 0) : 1234;
+    port = argc > 2 ? strtol(argv[2], NULL, 0) : 1234;
 	stream_led_init();
 	stream_led_set(1);
+
+		/* 启动时自动从电脑同步时间 */
+	if (dst_ip)
+	{
+		sync_time_from_pc(dst_ip);
+	}
 
 	printf("demo_main driver_config\n");
 
@@ -792,7 +885,7 @@ int main(int argc, char *argv[])
 
 	
 	FH_VPU_SIZE vi_pic;
-	vi_pic.vi_size.u32Width  = ISP_W;
+	vi_pic.vi_size.u32Width = ISP_W;
 	vi_pic.vi_size.u32Height = ISP_H;
 	vi_pic.crop_area.crop_en = 0;
 	vi_pic.crop_area.vpu_crop_area.u32X = 0;
@@ -800,7 +893,7 @@ int main(int argc, char *argv[])
 	vi_pic.crop_area.vpu_crop_area.u32Width = 0;
 	vi_pic.crop_area.vpu_crop_area.u32Height = 0;
 
-	ret = FH_VPSS_SetViAttr(GROUP_ID,&vi_pic);
+	ret = FH_VPSS_SetViAttr(GROUP_ID, &vi_pic);
 	CHECK_RET(ret != 0, ret);
 
 	ret = FH_VPSS_Enable(GROUP_ID, VPU_MODE_ISP);
@@ -941,7 +1034,7 @@ int main(int argc, char *argv[])
 	isp_set_param(ISP_NR, 1);
 
 	isp_set_param(ISP_MF, 3);
-#if 1
+#if 0
 	FH_VPU_MASK stVpumaskinfo;
 	memset(&stVpumaskinfo,0x0,sizeof(FH_VPU_MASK));
 
@@ -971,8 +1064,8 @@ int main(int argc, char *argv[])
 
 	while (!g_sig_stop)
     {
-        sample_update_bitrate_osd();
-		usleep(1000000);
+        //sample_update_bitrate_osd();
+		usleep(200000);
     }
 
 	printf("stream stopped, LED OFF\n");
