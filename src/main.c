@@ -19,8 +19,9 @@
 #include "sensor.h"
 
 #include "vicap/fh_vicap_mpi.h"
+#include <time.h>
 
-
+/*123456123456*/
 #define CHECK_RET(state, error_code)																	\
 	if (state)																						\
 	{																								\
@@ -65,6 +66,15 @@ struct isp_sensor_if sensor_func;
 
 static int g_get_stream_stop = 0;
 static int g_get_stream_running = 0;
+
+
+static time_t g_stopwatch_start = 0;  /* 秒表起始时间戳 */
+static time_t g_record_start_time = 0; /* 录制开始时间戳 */
+static int    g_recording   = 0;   /* 录制状态: 0=空闲, 1=录制中 */
+static int    g_record_done = 0;   /* 录制完成标记 */
+static int    g_record_error = 0;  /* 录制错误码: 0=正常, 1=subscribe失败, 2=unsubscribe失败 */
+
+static pthread_t g_thread_stream;   /* stream线程句柄，用于安全退出join */
 
 #define GROUP_ID 0 
 
@@ -561,6 +571,8 @@ int sample_set_osd()
     }
 	text_line_cfg[0].textInfo = text_data[0];
 	text_line_cfg[1].textInfo = text_data[1];
+	text_line_cfg[2].textInfo = text_data[2];
+	text_line_cfg[3].textInfo = text_data[3];
 	FH_CHAR user_tag_data[] = {
         0xe4, 0x0d+0, /*FHT_OSD_USER1,*/
         0x0a,               
@@ -613,6 +625,53 @@ int sample_set_osd()
 		return ret;
 	}
 #endif
+
+#if 1
+    /* line 2: 码率显示（动态，每秒更新）- 初始值 */
+    sprintf(text_line_cfg[2].textInfo, "Bitrate: 0.00 Mbps");
+    text_line_cfg[2].textEnable    = 1;
+    text_line_cfg[2].timeOsdEnable = 0;
+    text_line_cfg[2].textLineWidth = (64 / 2) * 36;
+    text_line_cfg[2].linePositionX = 50;
+    text_line_cfg[2].linePositionY = 120;
+    text_line_cfg[2].lineId        = 2;
+    text_line_cfg[2].enable        = 1;
+
+    ret = FHAdv_Osd_SetTextLine(0, 0, pOsdLayerInfo[0].layerId, &text_line_cfg[2]);
+    if (ret != FH_SUCCESS)
+    {
+        printf("FHAdv_Osd_SetTextLine line2 failed with %d\n", ret);
+        return ret;
+    }
+#endif
+
+#if 1
+    /* 初始化秒表计时器 */
+    {
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        g_stopwatch_start = now.tv_sec;
+    }
+
+    /* line 3: 秒表显示（动态，每秒更新）- 初始值 */
+    sprintf(text_line_cfg[3].textInfo, "00:00:00");
+    printf("[STOPWATCH] started at 00:00:00\n");
+
+    text_line_cfg[3].textEnable    = 1;
+    text_line_cfg[3].timeOsdEnable = 0;
+    text_line_cfg[3].textLineWidth = (64 / 2) * 36;
+    text_line_cfg[3].linePositionX = 640;
+    text_line_cfg[3].linePositionY = 120;
+    text_line_cfg[3].lineId        = 3;
+    text_line_cfg[3].enable        = 1;
+
+    ret = FHAdv_Osd_SetTextLine(0, 0, pOsdLayerInfo[0].layerId, &text_line_cfg[3]);
+    if (ret != FH_SUCCESS)
+    {
+        printf("FHAdv_Osd_SetTextLine line3 failed with %d\n", ret);
+        return ret;
+    }
+#endif
 	return 0;
 }
 
@@ -653,6 +712,82 @@ FH_VOID sample_common_media_driver_config(FH_VOID)
     WR_PROC_DEV(JPEG_PROC, "mjpgstm_12000000_2");
 	
 }
+/**
+ * sample_record_state_machine
+ *
+ * 独立的录制状态机，基于 CLOCK_MONOTONIC 计时器。
+ * 由主循环每秒调用一次。
+ *
+ * 状态流转:
+ *   IDLE  --(首次调用)--> RECORDING --(60秒后)--> DONE
+ *
+ * 返回值: 0=正常, -1=subscribe失败, -2=unsubscribe失败
+ */
+static int sample_record_state_machine(void)
+{
+    struct timespec now_ts;
+    int ret;
+
+    /* 录制周期已完成，不再处理 */
+    if (g_record_done)
+        return 0;
+
+    clock_gettime(CLOCK_MONOTONIC, &now_ts);
+
+    /* ========== 状态1: 空闲 → 启动录制 ========== */
+    if (!g_recording)
+    {
+        /* 确保 DMC record 输出目录 */
+        chdir("/home");
+
+        ret = dmc_record_subscribe(1);
+        if (ret != 0)
+        {
+            printf("[RECORD] ERROR: dmc_record_subscribe(1) FAILED, "
+                   "ret=0x%x (%d)\n", ret, ret);
+            printf("[RECORD] HINT: check if DMC is initialized, "
+                   "disk is writable, or /home exists\n");
+            g_record_error = 1;
+            /* 不设置 g_recording=1，下次循环自动重试 */
+            return -1;
+        }
+
+        /* subscribe 成功 */
+        g_recording         = 1;
+        g_record_start_time = now_ts.tv_sec;
+        g_record_error      = 0;
+        printf("[RECORD] OK: dmc_record_subscribe(1) succeeded, "
+               "file: /home/chan_0.h264, start_ts=%ld\n",
+               (long)g_record_start_time);
+        return 0;
+    }
+
+    /* ========== 状态2: 录制中 → 检查是否到达停止时间 ========== */
+    if (now_ts.tv_sec - g_record_start_time >= 60)
+    {
+        ret = dmc_record_unsubscribe();
+        if (ret != 0)
+        {
+            printf("[RECORD] ERROR: dmc_record_unsubscribe() FAILED, "
+                   "ret=0x%x (%d)\n", ret, ret);
+            printf("[RECORD] WARN: file may be incomplete or corrupted\n");
+            g_record_error = 2;
+            /* 即使 unsubscribe 失败也标记 done，避免死循环重试 */
+        }
+        else
+        {
+            printf("[RECORD] OK: dmc_record_unsubscribe() succeeded, "
+                   "60s recording complete, file: /home/chan_0.h264\n");
+        }
+
+        g_recording = 0;
+        g_record_done = 1;
+        return (ret != 0) ? -2 : 0;
+    }
+
+    return 0;
+}
+
 static int sample_update_bitrate_osd(void)
 {
     FH_CHN_STATUS status = {0};
@@ -675,15 +810,61 @@ static int sample_update_bitrate_osd(void)
     line_cfg.textEnable = 1;
     line_cfg.timeOsdEnable = 0;
     line_cfg.textLineWidth = (64 / 2) * 36;
-    line_cfg.linePositionX = 320;
-    line_cfg.linePositionY = 50;
-    line_cfg.lineId = 0;
+    line_cfg.linePositionX = 50;
+    line_cfg.linePositionY = 120;
+    line_cfg.lineId = 2;
     line_cfg.enable = 1;
 
     ret = FHAdv_Osd_SetTextLine(0, 0, 0, &line_cfg);
     if (ret != FH_SUCCESS)
     {
         printf("Update bitrate OSD failed: 0x%x\n", ret);
+    }
+
+
+	{
+        FHT_OSD_TextLine_t sw_line;
+        FH_CHAR sw_text[128];
+        struct timespec now_ts;
+        time_t elapsed;
+        int hh, mm, ss;
+
+        clock_gettime(CLOCK_MONOTONIC, &now_ts);
+        elapsed = now_ts.tv_sec - g_stopwatch_start;
+
+        hh = (int)(elapsed / 3600);
+        mm = (int)((elapsed % 3600) / 60);
+        ss = (int)(elapsed % 60);
+
+        memset(&sw_line, 0, sizeof(sw_line));
+        memset(sw_text, 0, sizeof(sw_text));
+
+        snprintf(sw_text, sizeof(sw_text), "%02d:%02d:%02d", hh, mm, ss);
+
+        sw_line.textInfo      = sw_text;
+        sw_line.textEnable    = 1;
+        sw_line.timeOsdEnable = 0;
+        sw_line.textLineWidth = (64 / 2) * 36;
+        sw_line.linePositionX = 640;
+        sw_line.linePositionY = 120;
+        sw_line.lineId        = 3;
+        sw_line.enable        = 1;
+
+        ret = FHAdv_Osd_SetTextLine(0, 0, 0, &sw_line);
+        if (ret != FH_SUCCESS)
+        {
+            printf("Update stopwatch OSD failed: 0x%x\n", ret);
+        }
+    }
+
+
+    /* ========== 录制状态机（独立函数） ========== */
+    {
+        int rec_ret = sample_record_state_machine();
+        if (rec_ret != 0)
+        {
+            printf("[RECORD] state machine error: %d\n", rec_ret);
+        }
     }
 
     return ret;
@@ -858,9 +1039,9 @@ int main(int argc, char *argv[])
 		g_get_stream_running = 1;
 		g_get_stream_stop = 0;
 		pthread_attr_init(&attr);
-		pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+		pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 		pthread_attr_setstacksize(&attr, 3 * 1024);
-		pthread_create(&thread_stream, &attr, sample_common_get_stream_proc, &g_get_stream_stop);
+		pthread_create(&g_thread_stream, &attr, sample_common_get_stream_proc, &g_get_stream_stop);
 	}
 #if 1
 	ret = sample_set_osd();
@@ -907,6 +1088,32 @@ int main(int argc, char *argv[])
 		usleep(1000000);
     }
 
+	printf("[EXIT] cleaning up...\n");
+
+    /* 1. 停止本地录制（如果还在录） */
+    if (g_recording)
+    {
+        dmc_record_unsubscribe();
+        printf("[EXIT] record unsubscribed\n");
+    }
+
+    /* 2. 停止PES推流（关闭UDP socket + /home/h264.ps） */
+    dmc_pes_unsubscribe();
+    printf("[EXIT] PES unsubscribed\n");
+
+    /* 3. 通知stream线程停止取帧 */
+    g_get_stream_stop = 1;
+
+    /* 4. 等待stream线程退出 */
+    if (g_get_stream_running)
+    {
+        pthread_join(g_thread_stream, NULL);
+        printf("[EXIT] stream thread joined\n");
+    }
+
+    /* 5. 清理DMC */
+    dmc_deinit();
+    printf("[EXIT] DMC deinitialized\n");
     return 0;
 }
 

@@ -723,7 +723,9 @@ static void *network_send_proc(void *arg)
             if (pkt)
             {
                 _VLC_UNLOCK();
+#if 1  /* PES_UDP_STREAMING: 1=推流, 0=仅本地保存 */
                 ret = sendto(fd, pkt->buf,  pkt->len, 0, (struct sockaddr *)&g_vlc_channel_info[i].target_addr, sizeof(struct sockaddr_in));
+#endif
                 if (ret < 0)
                 {
                     printf("ERROR: libpes send(%d) failed,%d\n", pkt->len, ret);
@@ -760,7 +762,7 @@ static void *network_send_proc(void *arg)
     }
 
     _VLC_UNLOCK();
-	fclose(ps_file);
+	if (ps_file) fclose(ps_file);
     close(fd);
     g_stop_request = 0;
     return NULL;

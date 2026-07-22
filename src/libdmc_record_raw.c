@@ -66,6 +66,15 @@ static int _record_input_fn(int media_chn,
         return -1;
     }
 
+#if 0  /* RECORD_UDP_STREAMING: 未来启用裸H264推流 */
+    /*
+     * TODO: 裸H264推流需要自行处理MTU分片(单帧可达数百KB, UDP MTU~1500B)
+     * 初始化时需创建 socket: record_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+     * 参考 libpes.c 中的 TS 分片逻辑和 network_send_proc 线程模型
+     */
+    // sendto(record_fd, frame_data, frame_len, 0, ...);
+#endif
+
     if (!g_record_files[media_chn].printed)
     {
         printf("Save stream in %s\n", g_record_files[media_chn].file_name);
@@ -95,7 +104,7 @@ int dmc_record_subscribe(int max_channel)
 
     g_max_num = max_channel;
 
-    dmc_subscribe("RECORD", DMC_MEDIA_TYPE_JPEG, _record_input_fn);
+    dmc_subscribe("RECORD", DMC_MEDIA_TYPE_H264 | DMC_MEDIA_TYPE_H265 | DMC_MEDIA_TYPE_JPEG, _record_input_fn);
 
     return 0;
 }
